@@ -1,0 +1,31 @@
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: racing
+  datasource:
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'
+      maximum-pool-size: 50
+      minimum-idle: 10
+  jpa:
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+
+server:
+  servlet:
+    context-path: /races
+
+racing:
+  engine:
+    url: https://click-racer-983614458473.europenorth1.run.app/api/fragile-fast/points/earn
+    fallback-url: https://click-racer-983614458473.europenorth1.run.app/api/stable-slow/points/earn
+  reporting:
+    url: https://click-racer-983614458473.europenorth1.run.app/api/fragile-fast/reporting/winners
+    fallback-url: https://click-racer-983614458473.europenorth1.run.app/api/stable-slow/reporting/winners
