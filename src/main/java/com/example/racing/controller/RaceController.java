@@ -5,6 +5,7 @@ import com.example.racing.dto.DriveResponse;
 import com.example.racing.dto.RaceDetailsResponse;
 import com.example.racing.dto.RaceResponse;
 import com.example.racing.service.RaceService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,7 +19,7 @@ public class RaceController {
     private final RaceService raceService;
 
     @PostMapping
-    public ResponseEntity<RaceResponse> createRace(@RequestBody CreateRaceRequest request) {
+    public ResponseEntity<RaceResponse> createRace(@RequestBody @Valid CreateRaceRequest request) {
         String raceId = raceService.createRace(request.durationInSeconds());
         return ResponseEntity.ok(new RaceResponse(raceId));
     }

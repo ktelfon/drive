@@ -29,3 +29,8 @@ racing:
   reporting:
     url: https://click-racer-983614458473.europenorth1.run.app/api/fragile-fast/reporting/winners
     fallback-url: https://click-racer-983614458473.europenorth1.run.app/api/stable-slow/reporting/winners
+  game:
+    oil-slick-cost: 10
+    engine-hack-cost: 20
+    freeze-percentage: 0.01
+    hack-penalty-limit: 11

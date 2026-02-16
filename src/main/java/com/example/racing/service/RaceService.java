@@ -12,6 +12,7 @@ import com.example.racing.repository.RacerRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -31,6 +32,18 @@ public class RaceService {
     private final ParticipantRepository participantRepository;
     private final EngineServiceClient engineServiceClient;
     private final RaceSchedulerService raceSchedulerService;
+
+    @Value("${racing.game.oil-slick-cost:10}")
+    private int oilSlickCost;
+
+    @Value("${racing.game.engine-hack-cost:20}")
+    private int engineHackCost;
+
+    @Value("${racing.game.freeze-percentage:0.01}")
+    private double freezePercentage;
+
+    @Value("${racing.game.hack-penalty-limit:11}")
+    private int hackPenaltyLimit;
 
     public String createRace(int durationInSeconds) {
         Race race = new Race();
@@ -152,12 +165,12 @@ public class RaceService {
             throw new IllegalStateException("Race is not active");
         }
 
-        int updatedRows = participantRepository.deductScoreIfSufficient(raceId, userId, 10);
+        int updatedRows = participantRepository.deductScoreIfSufficient(raceId, userId, oilSlickCost);
         if (updatedRows == 0) {
             throw new IllegalStateException("Insufficient points or participant not found");
         }
 
-        double freezeDurationSeconds = race.getDurationInSeconds() * 0.01;
+        double freezeDurationSeconds = race.getDurationInSeconds() * freezePercentage;
         participantRepository.applyOilSlick(raceId, userId, freezeDurationSeconds);
     }
 
@@ -170,12 +183,11 @@ public class RaceService {
             throw new IllegalStateException("Race is not active");
         }
 
-        int updatedRows = participantRepository.deductScoreIfSufficient(raceId, userId, 20);
-
+        int updatedRows = participantRepository.deductScoreIfSufficient(raceId, userId, engineHackCost);
         if (updatedRows == 0) {
             throw new IllegalStateException("Insufficient points or participant not found");
         }
 
-        participantRepository.applyRandomPenalty(raceId, userId, 11);
+        participantRepository.applyRandomPenalty(raceId, userId, hackPenaltyLimit);
     }
 }
