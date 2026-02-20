@@ -55,7 +55,10 @@ public class RaceController {
     }
 
     @GetMapping("/{raceId}")
-    public ResponseEntity<RaceDetailsResponse> getRace(@PathVariable UUID raceId) {
-        return ResponseEntity.ok(raceService.getRaceDetails(raceId));
+    public ResponseEntity<RaceDetailsResponse> getRace(
+            @PathVariable UUID raceId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return ResponseEntity.ok(raceService.getRaceDetails(raceId, page, size));
     }
 }

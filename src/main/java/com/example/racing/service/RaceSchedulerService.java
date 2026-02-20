@@ -32,31 +32,33 @@ public class RaceSchedulerService {
 
     @Transactional
     public void finishRace(UUID raceId) {
-        Race race = raceRepository.findById(raceId).orElse(null);
+        int updated = raceRepository.transitionState(raceId, RaceStatus.ACTIVE, RaceStatus.FINISHED);
 
-        if (race != null && race.getState() == RaceStatus.ACTIVE) {
-            race.setState(RaceStatus.FINISHED);
-            raceRepository.saveAndFlush(race); // Ensure DB is updated immediately
-            log.info("Race {} finished automatically by timer trigger.", raceId);
+        if (updated == 0) {
+            log.debug("Race {} was already finished or not found, skipping.", raceId);
+            return;
+        }
 
-            List<RaceParticipant> participants = race.getParticipants();
-            
-            if (participants.isEmpty()) {
-                log.warn("No participants found for race {} when finishing!", raceId);
-            }
+        log.info("Race {} finished.", raceId);
 
-            List<ReportingServiceClient.WinnerDto> top3 = IntStream.range(0, Math.min(participants.size(), 3))
-                    .mapToObj(i -> {
-                        RaceParticipant p = participants.get(i);
-                        return new ReportingServiceClient.WinnerDto(i + 1, p.getRacer().getId(), p.getScore());
-                    })
-                    .collect(Collectors.toList());
+        Race race = raceRepository.findById(raceId).orElseThrow();
+        List<RaceParticipant> participants = race.getParticipants();
 
-            if (!top3.isEmpty()) {
-                reportingServiceClient.reportWinners(raceId, top3);
-            } else {
-                log.warn("Top 3 list is empty for race {}, skipping reporting.", raceId);
-            }
+        if (participants.isEmpty()) {
+            log.warn("No participants found for race {} when finishing!", raceId);
+        }
+
+        List<ReportingServiceClient.WinnerDto> top3 = IntStream.range(0, Math.min(participants.size(), 3))
+                .mapToObj(i -> {
+                    RaceParticipant p = participants.get(i);
+                    return new ReportingServiceClient.WinnerDto(i + 1, p.getRacer().getId(), p.getScore());
+                })
+                .collect(Collectors.toList());
+
+        if (!top3.isEmpty()) {
+            reportingServiceClient.reportWinners(raceId, top3);
+        } else {
+            log.warn("Top 3 list is empty for race {}, skipping reporting.", raceId);
         }
     }
 }

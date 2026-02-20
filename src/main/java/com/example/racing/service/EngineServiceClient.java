@@ -2,19 +2,27 @@ package com.example.racing.service;
 
 import lombok.Data;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestTemplate;
+
+import java.time.Duration;
 
 @Service
 public class EngineServiceClient {
-    private final RestClient restClient;
+    private final RestTemplate restTemplate;
     private final String primaryUrl;
     private final String fallbackUrl;
 
-    public EngineServiceClient(RestClient.Builder builder,
+    public EngineServiceClient(RestTemplateBuilder builder,
                                @Value("${racing.engine.url}") String primaryUrl,
-                               @Value("${racing.engine.fallback-url}") String fallbackUrl) {
-        this.restClient = builder.build();
+                               @Value("${racing.engine.fallback-url}") String fallbackUrl,
+                               @Value("${racing.engine.connect-timeout-seconds:3}") int connectTimeoutSeconds,
+                               @Value("${racing.engine.read-timeout-seconds:5}") int readTimeoutSeconds) {
+        this.restTemplate = builder
+                .connectTimeout(Duration.ofSeconds(connectTimeoutSeconds))
+                .readTimeout(Duration.ofSeconds(readTimeoutSeconds))
+                .build();
         this.primaryUrl = primaryUrl;
         this.fallbackUrl = fallbackUrl;
     }
@@ -32,10 +40,7 @@ public class EngineServiceClient {
     }
 
     private int callApi(String url) {
-        PointsResponse response = restClient.post()
-                .uri(url)
-                .retrieve()
-                .body(PointsResponse.class);
+        PointsResponse response = restTemplate.postForObject(url, null, PointsResponse.class);
         return (response != null) ? response.getPoints() : 0;
     }
 

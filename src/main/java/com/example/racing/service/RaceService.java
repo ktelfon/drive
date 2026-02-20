@@ -95,7 +95,7 @@ public class RaceService {
     }
 
     @Transactional
-    public RaceDetailsResponse getRaceDetails(UUID raceId) {
+    public RaceDetailsResponse getRaceDetails(UUID raceId, int page, int size) {
         Race race = raceRepository.findById(raceId).orElseThrow();
 
         if (race.getState() == RaceStatus.ACTIVE
@@ -106,13 +106,17 @@ public class RaceService {
             race = raceRepository.findById(raceId).orElseThrow();
         }
 
-        List<RaceParticipant> participants = race.getParticipants();
+        List<RaceParticipant> allParticipants = race.getParticipants();
+        int total = allParticipants.size();
+        int fromIndex = Math.min(page * size, total);
+        int toIndex = Math.min(fromIndex + size, total);
+        List<RaceParticipant> pageParticipants = allParticipants.subList(fromIndex, toIndex);
 
-        List<RaceDetailsResponse.LeaderboardEntry> leaderboard = IntStream.range(0, participants.size())
+        List<RaceDetailsResponse.LeaderboardEntry> leaderboard = IntStream.range(0, pageParticipants.size())
                 .mapToObj(i -> {
-                    RaceParticipant p = participants.get(i);
+                    RaceParticipant p = pageParticipants.get(i);
                     return RaceDetailsResponse.LeaderboardEntry.builder()
-                            .rank(i + 1)
+                            .rank(fromIndex + i + 1)
                             .racerId(p.getRacer().getId())
                             .score(p.getScore())
                             .build();
@@ -127,6 +131,9 @@ public class RaceService {
                 .leaderboard(leaderboard)
                 .createdAt(race.getCreatedAt())
                 .updatedAt(race.getUpdatedAt())
+                .totalParticipants(total)
+                .page(page)
+                .size(size)
                 .build();
     }
 

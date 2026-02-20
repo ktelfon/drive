@@ -26,9 +26,13 @@ racing:
   engine:
     url: https://click-racer-983614458473.europenorth1.run.app/api/fragile-fast/points/earn
     fallback-url: https://click-racer-983614458473.europenorth1.run.app/api/stable-slow/points/earn
+    connect-timeout-seconds: 3
+    read-timeout-seconds: 5
   reporting:
     url: https://click-racer-983614458473.europenorth1.run.app/api/fragile-fast/reporting/winners
     fallback-url: https://click-racer-983614458473.europenorth1.run.app/api/stable-slow/reporting/winners
+    connect-timeout-seconds: 3
+    read-timeout-seconds: 10
   game:
     oil-slick-cost: 10
     engine-hack-cost: 20

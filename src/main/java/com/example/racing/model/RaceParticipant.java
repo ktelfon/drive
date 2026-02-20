@@ -9,6 +9,10 @@ import java.util.UUID;
 
 @Entity
 @Data
+@Table(indexes = {
+        @Index(name = "idx_race_participant_race_id", columnList = "race_id"),
+        @Index(name = "idx_race_participant_racer_id", columnList = "racer_id")
+})
 public class RaceParticipant {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

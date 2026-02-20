@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,8 +25,13 @@ public class ReportingServiceClient {
     public ReportingServiceClient(RestTemplateBuilder builder,
                                   ObjectMapper objectMapper,
                                   @Value("${racing.reporting.url}") String primaryUrl,
-                                  @Value("${racing.reporting.fallback-url}") String fallbackUrl) {
-        this.restTemplate = builder.build();
+                                  @Value("${racing.reporting.fallback-url}") String fallbackUrl,
+                                  @Value("${racing.reporting.connect-timeout-seconds:3}") int connectTimeoutSeconds,
+                                  @Value("${racing.reporting.read-timeout-seconds:10}") int readTimeoutSeconds) {
+        this.restTemplate = builder
+                .connectTimeout(Duration.ofSeconds(connectTimeoutSeconds))
+                .readTimeout(Duration.ofSeconds(readTimeoutSeconds))
+                .build();
         this.objectMapper = objectMapper;
         this.primaryUrl = primaryUrl;
         this.fallbackUrl = fallbackUrl;

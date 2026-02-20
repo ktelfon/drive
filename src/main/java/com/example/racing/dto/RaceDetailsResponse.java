@@ -18,6 +18,9 @@ public class RaceDetailsResponse {
     private List<LeaderboardEntry> leaderboard;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private int totalParticipants;
+    private int page;
+    private int size;
 
     @Data
     @Builder
