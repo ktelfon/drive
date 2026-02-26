@@ -17,7 +17,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -32,6 +34,7 @@ public class RaceService {
     private final ParticipantRepository participantRepository;
     private final EngineServiceClient engineServiceClient;
     private final RaceSchedulerService raceSchedulerService;
+    private final RedisScoreBufferService redisScoreBufferService;
 
     @Value("${racing.game.oil-slick-cost:10}")
     private int oilSlickCost;
@@ -106,7 +109,22 @@ public class RaceService {
             race = raceRepository.findById(raceId).orElseThrow();
         }
 
+        // Fetch pending scores from Redis
+        Map<UUID, Integer> pendingScores = redisScoreBufferService.getPendingScores(raceId);
+
         List<RaceParticipant> allParticipants = race.getParticipants();
+        
+        // Merge DB scores with pending scores
+        allParticipants.forEach(p -> {
+            Integer pending = pendingScores.get(p.getRacer().getId());
+            if (pending != null) {
+                p.setScore(p.getScore() + pending);
+            }
+        });
+
+        // Re-sort because scores changed
+        allParticipants.sort(Comparator.comparingInt(RaceParticipant::getScore).reversed());
+
         int total = allParticipants.size();
         int fromIndex = Math.min(page * size, total);
         int toIndex = Math.min(fromIndex + size, total);
@@ -157,7 +175,7 @@ public class RaceService {
         int earnedPoints = engineServiceClient.fetchPoints();
 
         if (earnedPoints > 0) {
-            participantRepository.incrementScore(raceId, userId, earnedPoints);
+            redisScoreBufferService.addScore(raceId, userId, earnedPoints);
         }
 
         return earnedPoints;

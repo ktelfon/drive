@@ -3,12 +3,8 @@ package com.example.racing.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 import java.util.List;
@@ -17,22 +13,19 @@ import java.util.UUID;
 @Service
 @Slf4j
 public class ReportingServiceClient {
-    private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
+    private final RestClient restClient;
     private final String primaryUrl;
     private final String fallbackUrl;
 
-    public ReportingServiceClient(RestTemplateBuilder builder,
-                                  ObjectMapper objectMapper,
+    public ReportingServiceClient(RestClient.Builder builder,
                                   @Value("${racing.reporting.url}") String primaryUrl,
                                   @Value("${racing.reporting.fallback-url}") String fallbackUrl,
                                   @Value("${racing.reporting.connect-timeout-seconds:3}") int connectTimeoutSeconds,
                                   @Value("${racing.reporting.read-timeout-seconds:10}") int readTimeoutSeconds) {
-        this.restTemplate = builder
-                .connectTimeout(Duration.ofSeconds(connectTimeoutSeconds))
-                .readTimeout(Duration.ofSeconds(readTimeoutSeconds))
+        this.restClient = builder
+                .setConnectTimeout(Duration.ofSeconds(connectTimeoutSeconds))
+                .setReadTimeout(Duration.ofSeconds(readTimeoutSeconds))
                 .build();
-        this.objectMapper = objectMapper;
         this.primaryUrl = primaryUrl;
         this.fallbackUrl = fallbackUrl;
     }
@@ -51,15 +44,12 @@ public class ReportingServiceClient {
         }
     }
 
-    private void callApi(String url, ReportWinnersRequest request) throws Exception {
-        String jsonBody = objectMapper.writeValueAsString(request);
-        log.info("Sending report to {}: {}", url, jsonBody);
-        
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
-        
-        restTemplate.postForEntity(url, entity, Void.class);
+    private void callApi(String url, ReportWinnersRequest request) {
+        restClient.post()
+                .uri(url)
+                .body(request)
+                .retrieve()
+                .toBodilessEntity();
     }
 
     public record ReportWinnersRequest(UUID raceId, List<WinnerDto> winners) {}

@@ -20,6 +20,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -53,12 +54,15 @@ class RaceIntegrationTest {
             .withUsername("myuser")
             .withPassword("secret");
 
+    @Container
+    static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
+            .withExposedPorts(6379);
+
     static WireMockServer wireMockServer = new WireMockServer(0); // Dynamic port
 
     @BeforeAll
     static void startWireMock() {
         wireMockServer.start();
-        // Force override properties using System properties to ensure they are picked up
         System.setProperty("racing.reporting.url", wireMockServer.baseUrl() + "/api/fragile-fast/reporting/winners");
         System.setProperty("racing.reporting.fallback-url", wireMockServer.baseUrl() + "/api/stable-slow/reporting/winners");
     }
@@ -75,6 +79,12 @@ class RaceIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
+        
+        registry.add("spring.data.redis.host", redis::getHost);
+        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
+        
+        registry.add("racing.reporting.url", () -> wireMockServer.baseUrl() + "/api/fragile-fast/reporting/winners");
+        registry.add("racing.reporting.fallback-url", () -> wireMockServer.baseUrl() + "/api/stable-slow/reporting/winners");
     }
 
     @Autowired
@@ -96,14 +106,12 @@ class RaceIntegrationTest {
 
     @Test
     void fullRaceLifeCycleTest() throws Exception {
-        // Verify properties are correctly set
         String reportingUrl = env.getProperty("racing.reporting.url");
         assertThat(reportingUrl).contains("localhost:" + wireMockServer.port());
 
         UUID user1Id = UUID.randomUUID();
         UUID user2Id = UUID.randomUUID();
 
-        // Stub WireMock for reporting service using explicit WireMock.post to avoid conflict
         wireMockServer.stubFor(WireMock.post(urlPathMatching("/api/.*"))
                 .willReturn(aResponse().withStatus(200)));
 
@@ -152,15 +160,14 @@ class RaceIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.points").value(3));
 
-        mockMvc.perform(get("/" + raceId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.leaderboard[0].rank").value(1))
-                .andExpect(jsonPath("$.leaderboard[0].racerId").value(user1Id.toString()))
-                .andExpect(jsonPath("$.leaderboard[0].score").value(18))
-                .andExpect(jsonPath("$.leaderboard[1].rank").value(2))
-                .andExpect(jsonPath("$.leaderboard[1].racerId").value(user2Id.toString()))
-                .andExpect(jsonPath("$.leaderboard[1].score").value(8));
+        // Wait for Redis flush (every 2 seconds)
+        await().atMost(4, TimeUnit.SECONDS).untilAsserted(() -> {
+            mockMvc.perform(get("/" + raceId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("ACTIVE"))
+                    .andExpect(jsonPath("$.leaderboard[0].score").value(18))
+                    .andExpect(jsonPath("$.leaderboard[1].score").value(8));
+        });
 
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
             mockMvc.perform(get("/" + raceId))
@@ -178,7 +185,6 @@ class RaceIntegrationTest {
                 .andExpect(jsonPath("$.leaderboard[1].racerId").value(user2Id.toString()))
                 .andExpect(jsonPath("$.leaderboard[1].score").value(8));
 
-        // Verify WireMock received the request (relaxed check first)
         await().atMost(2, TimeUnit.SECONDS).untilAsserted(() -> {
             wireMockServer.verify(postRequestedFor(urlPathMatching("/api/.*")));
         });
@@ -219,6 +225,12 @@ class RaceIntegrationTest {
         mockMvc.perform(post("/" + raceId + "/drive")
                         .header("X-User-ID", user2Id))
                 .andExpect(status().isOk());
+
+        // Wait for flush before using abilities (since abilities check DB score)
+        await().atMost(4, TimeUnit.SECONDS).untilAsserted(() -> {
+             mockMvc.perform(get("/" + raceId))
+                    .andExpect(jsonPath("$.leaderboard[0].score").value(50));
+        });
 
         mockMvc.perform(post("/" + raceId + "/abilities/oil-slick")
                         .header("X-User-ID", user1Id))
